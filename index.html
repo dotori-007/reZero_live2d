@@ -291,16 +291,29 @@
     let modelBaseWidth = 1000;
     let modelBaseHeight = 1000;
 
-    let targetGazeX = 0;
-    let targetGazeY = 0;
-    let currentGazeX = 0;
-    let currentGazeY = 0;
+    let targetFocusX = 0;
+    let targetFocusY = 0;
+    let currentFocusX = 0;
+    let currentFocusY = 0;
+    let lastMouseMoveTime = Date.now();
+    let isTrackingActive = false;
 
     let isSpeaking = false;
     let mouthOscillator = 0;
     let speechTimer = null;
     let displayMode = 'bubble';
     let subtitleEnabled = true;
+    let lastMsgId = 0;
+    let lastProcessedMsgId = 0;
+
+    // Drag-to-move handling (Left-click & Right-click)
+    let leftDownX = 0, leftDownY = 0;
+    let leftDownTime = 0;
+    let isLeftDragging = false;
+    let dragPrevX = 0, dragPrevY = 0;
+
+    let isRightDragging = false;
+    let dragStartX = 0, dragStartY = 0;
 
     function showToast(msg, duration = 1500) {
       const el = document.getElementById('toastMsg');
@@ -320,46 +333,26 @@
       });
       container.appendChild(app.view);
 
-      // Mouse drag setup
-      container.addEventListener('mousedown', (e) => {
-        if (e.button === 0 && window.pywebview && window.pywebview.api) {
-          window.pywebview.api.start_drag();
-        }
-      });
-
-      // Context menu
-      window.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        toggleQuickPicker();
-      });
-
-      // Mouse tracking loop
-      setInterval(() => {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_tracking) {
-          window.pywebview.api.get_tracking().then(data => {
-            targetGazeX = data.x;
-            targetGazeY = data.y;
-          }).catch(() => {});
-        }
-      }, 50);
-
       // Live2D Ticker
       app.ticker.add((delta) => {
         if (!live2dModel || !live2dModel.internalModel || !live2dModel.internalModel.coreModel) return;
         const core = live2dModel.internalModel.coreModel;
 
-        // Smooth gaze interpolation
-        currentGazeX += (targetGazeX - currentGazeX) * 0.14;
-        currentGazeY += (targetGazeY - currentGazeY) * 0.14;
+        currentFocusX += (targetFocusX - currentFocusX) * 0.14;
+        currentFocusY += (targetFocusY - currentFocusY) * 0.14;
+
+        const finalAngleX = currentFocusX * 24;
+        const finalAngleY = currentFocusY * 18;
+        const finalAngleZ = currentFocusX * -5;
+        const finalBodyX = currentFocusX * 7;
 
         try {
-          core.setParameterValueById('ParamAngleX', currentGazeX * 28.0);
-          core.setParameterValueById('ParamAngleY', -currentGazeY * 28.0);
-          core.setParameterValueById('ParamAngleZ', currentGazeX * -8.0);
-
-          core.setParameterValueById('ParamEyeBallX', currentGazeX * 0.85);
-          core.setParameterValueById('ParamEyeBallY', -currentGazeY * 0.85);
-          core.setParameterValueById('ParamBodyAngleX', currentGazeX * 9.0);
+          core.setParameterValueById('ParamEyeBallX', Math.max(-1, Math.min(1, currentFocusX * 0.9)));
+          core.setParameterValueById('ParamEyeBallY', Math.max(-1, Math.min(1, currentFocusY * 0.9)));
+          core.setParameterValueById('ParamAngleX', Math.max(-30, Math.min(30, finalAngleX)));
+          core.setParameterValueById('ParamAngleY', Math.max(-30, Math.min(30, finalAngleY)));
+          core.setParameterValueById('ParamAngleZ', Math.max(-30, Math.min(30, finalAngleZ)));
+          core.setParameterValueById('ParamBodyAngleX', Math.max(-10, Math.min(10, finalBodyX)));
         } catch(e) {}
 
         // Natural lip animation during dialogue/speech
@@ -372,6 +365,157 @@
         }
       });
     }
+
+    // Window Dragging & Cursor Interaction
+    window.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.quick-bar, .char-picker-modal, .speech-bubble, button, input')) {
+        return;
+      }
+
+      if (e.button === 0) {
+        leftDownX = e.screenX;
+        leftDownY = e.screenY;
+        dragPrevX = e.screenX;
+        dragPrevY = e.screenY;
+        leftDownTime = Date.now();
+        isLeftDragging = false;
+      } else if (e.button === 2) {
+        isRightDragging = true;
+        dragStartX = e.screenX;
+        dragStartY = e.screenY;
+        dragPrevX = e.screenX;
+        dragPrevY = e.screenY;
+        document.body.style.cursor = 'move';
+      }
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      lastMouseMoveTime = Date.now();
+
+      // Local gaze tracking relative to window center
+      const w = window.innerWidth || 320;
+      const h = window.innerHeight || 400;
+      targetFocusX = Math.max(-1.0, Math.min(1.0, (e.clientX - w / 2) / (w / 2)));
+      targetFocusY = Math.max(-1.0, Math.min(1.0, -(e.clientY - h / 2) / (h / 2)));
+
+      // Left mouse drag
+      if (e.buttons === 1) {
+        const totalDist = Math.hypot(e.screenX - leftDownX, e.screenY - leftDownY);
+        if (totalDist > 3) {
+          isLeftDragging = true;
+          document.body.style.cursor = 'move';
+          const dx = e.screenX - dragPrevX;
+          const dy = e.screenY - dragPrevY;
+          dragPrevX = e.screenX;
+          dragPrevY = e.screenY;
+          if (window.pywebview && window.pywebview.api && window.pywebview.api.move_window) {
+            window.pywebview.api.move_window(dx, dy);
+          }
+        }
+      }
+      // Right mouse drag
+      else if (isRightDragging && (e.buttons === 2 || e.buttons === 0)) {
+        const dx = e.screenX - dragPrevX;
+        const dy = e.screenY - dragPrevY;
+        dragPrevX = e.screenX;
+        dragPrevY = e.screenY;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.move_window) {
+          window.pywebview.api.move_window(dx, dy);
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      document.body.style.cursor = 'default';
+
+      if (e.button === 0) {
+        const totalDist = Math.hypot(e.screenX - leftDownX, e.screenY - leftDownY);
+        const elapsed = Date.now() - leftDownTime;
+        if (!isLeftDragging && totalDist <= 4 && elapsed < 350) {
+          if (!e.target.closest('.quick-bar, .char-picker-modal, button, input')) {
+            onModelClick();
+          }
+        }
+        isLeftDragging = false;
+      }
+
+      if (e.button === 2) {
+        const totalDist = Math.hypot(e.screenX - dragStartX, e.screenY - dragStartY);
+        if (totalDist <= 4) {
+          toggleQuickPicker();
+        }
+        isRightDragging = false;
+      }
+    });
+
+    window.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    // Touch click reaction on mascot
+    function onModelClick() {
+      const quotes = [
+        "스바루 군, 무슨 일 있으신가요?",
+        "언제나 응원하고 있어요!",
+        "오늘 작업도 렘이 함께할게요!",
+        "렘은 언제나 지켜보고 있답니다."
+      ];
+      const q = quotes[Math.floor(Math.random() * quotes.length)];
+      fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: q, emotion: 'joy_cheer' })
+      }).catch(() => {});
+    }
+
+    // Global cursor tracking loop
+    async function startGlobalMouseTracking() {
+      if (isTrackingActive) return;
+      isTrackingActive = true;
+
+      while (true) {
+        try {
+          const now = Date.now();
+          if (now - lastMouseMoveTime > 80 && window.pywebview && window.pywebview.api && window.pywebview.api.get_tracking) {
+            const data = await window.pywebview.api.get_tracking();
+            if (data) {
+              const fx = (typeof data.fx === 'number') ? data.fx : data.x;
+              const fy = (typeof data.fy === 'number') ? data.fy : -data.y;
+              if (typeof fx === 'number' && typeof fy === 'number') {
+                targetFocusX = fx;
+                targetFocusY = fy;
+              }
+            }
+          }
+          if (now - lastMouseMoveTime > 4500) {
+            targetFocusX = targetFocusX * 0.95;
+            targetFocusY = targetFocusY * 0.95;
+          }
+        } catch(e) {}
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+    }
+
+    window.addEventListener('pywebviewready', () => {
+      startGlobalMouseTracking();
+    });
+    setTimeout(startGlobalMouseTracking, 600);
+
+    // Speech polling queue
+    async function checkSpeechQueue() {
+      try {
+        const res = await fetch('/api/poll_speech?last=' + lastMsgId);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.msgId && data.msgId > lastMsgId) {
+            lastMsgId = data.msgId;
+            window.playSpeech(data);
+          }
+        }
+      } catch(e) {}
+      setTimeout(checkSpeechQueue, 80);
+    }
+    setTimeout(checkSpeechQueue, 300);
 
     function resizeModel() {
       if (!live2dModel) return;
@@ -416,10 +560,12 @@
               resizeModel();
               showToast('🌸 ' + info.displayName + ' 준비 완료!');
               updatePickerActive(charId);
+              fetch('/api/model_loaded?id=' + encodeURIComponent(info.id)).catch(() => {});
             })
             .catch(err => {
               console.error('Model load error:', err);
               showToast('❌ 모델 로드 실패: ' + err.message);
+              fetch('/api/model_error?id=' + encodeURIComponent(info.id) + '&error=' + encodeURIComponent(err.message)).catch(() => {});
             });
         })
         .catch(err => {
@@ -429,6 +575,11 @@
 
     // Dialogue & Motion Playback (TTS-Free)
     window.playSpeech = function(payload) {
+      if (!payload) return;
+      if (payload.msgId) {
+        if (payload.msgId <= lastProcessedMsgId) return;
+        lastProcessedMsgId = payload.msgId;
+      }
       const text = payload.text || '';
       const motion = payload.motion;
 

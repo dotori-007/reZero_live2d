@@ -83,6 +83,23 @@ class MEMORYSTATUSEX(ctypes.Structure):
         ('ullAvailExtendedVirtual', ctypes.c_uint64),
     ]
 
+class LASTINPUTINFO(ctypes.Structure):
+    _fields_ = [('cbSize', wintypes.UINT), ('dwTime', wintypes.DWORD)]
+
+class FILETIME(ctypes.Structure):
+    _fields_ = [('dwLowDateTime', wintypes.DWORD), ('dwHighDateTime', wintypes.DWORD)]
+
+def get_idle_seconds():
+    try:
+        lii = LASTINPUTINFO()
+        lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
+        if user32.GetLastInputInfo(ctypes.byref(lii)):
+            tick = ctypes.windll.kernel32.GetTickCount()
+            return max(0.0, (tick - lii.dwTime) / 1000.0)
+    except Exception:
+        pass
+    return 0.0
+
 def get_system_load():
     mem_load = 0
     try:
@@ -92,7 +109,27 @@ def get_system_load():
             mem_load = stat.dwMemoryLoad
     except Exception:
         pass
-    return 10.0, float(mem_load)
+
+    cpu_load = 0.0
+    try:
+        def _to_int(ft):
+            return (ft.dwHighDateTime << 32) + ft.dwLowDateTime
+        idle1, kernel1, user1 = FILETIME(), FILETIME(), FILETIME()
+        ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle1), ctypes.byref(kernel1), ctypes.byref(user1))
+        time.sleep(0.12)
+        idle2, kernel2, user2 = FILETIME(), FILETIME(), FILETIME()
+        ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle2), ctypes.byref(kernel2), ctypes.byref(user2))
+
+        idle = _to_int(idle2) - _to_int(idle1)
+        kernel = _to_int(kernel2) - _to_int(kernel1)
+        user = _to_int(user2) - _to_int(user1)
+        total = kernel + user
+        if total > 0:
+            cpu_load = max(0.0, min(100.0, 100.0 * (total - idle) / total))
+    except Exception:
+        pass
+
+    return round(cpu_load, 1), float(mem_load)
 
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 DEFAULT_CONFIG = {
@@ -202,7 +239,11 @@ class TrackerApi:
         if self.hwnd and user32.IsWindow(self.hwnd):
             rect = wintypes.RECT()
             user32.GetWindowRect(self.hwnd, ctypes.byref(rect))
-            user32.SetWindowPos(self.hwnd, 0, rect.left + int(dx), rect.top + int(dy), 0, 0, 0x0001 | 0x0004 | 0x0010)
+            dpi = user32.GetDpiForWindow(self.hwnd) if hasattr(user32, 'GetDpiForWindow') else 96
+            scale = (dpi / 96.0) if dpi else 1.0
+            move_x = int(dx * scale)
+            move_y = int(dy * scale)
+            user32.SetWindowPos(self.hwnd, 0, rect.left + move_x, rect.top + move_y, 0, 0, 0x0001 | 0x0004 | 0x0010)
             return True
         return False
 
@@ -212,13 +253,28 @@ class TrackerApi:
             user32.GetWindowRect(self.hwnd, ctypes.byref(rect))
             new_w = max(260, min(1920, int(width)))
             new_h = max(320, min(1440, int(height)))
-            new_x = rect.right - new_w
-            new_y = rect.bottom - new_h
-            user32.SetWindowPos(self.hwnd, 0, new_x, new_y, new_w, new_h, 0x0004 | 0x0010)
+            dpi = user32.GetDpiForWindow(self.hwnd) if hasattr(user32, 'GetDpiForWindow') else 96
+            scale = (dpi / 96.0) if dpi else 1.0
+            phys_w = int(new_w * scale)
+            phys_h = int(new_h * scale)
+            new_x = rect.right - phys_w
+            new_y = rect.bottom - phys_h
+            user32.SetWindowPos(self.hwnd, 0, new_x, new_y, phys_w, phys_h, 0x0004 | 0x0010)
             cfg = load_config()
             cfg["win_w"] = new_w
             cfg["win_h"] = new_h
             save_config(cfg)
+            if main_window:
+                try:
+                    main_window.evaluate_js(f"window.onConfigUpdated && window.onConfigUpdated({json.dumps(cfg)}); window.resizeModel && window.resizeModel();")
+                except Exception:
+                    pass
+            return True
+        return False
+
+    def bring_to_front(self):
+        if self.hwnd and user32.IsWindow(self.hwnd):
+            user32.SetWindowPos(self.hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040)
             return True
         return False
 
@@ -235,19 +291,88 @@ class TrackerApi:
             center_y = 540
         dx = pt.x - center_x
         dy = pt.y - center_y
-        dist = max(1.0, (dx*dx + dy*dy)**0.5)
-        max_dist = 600.0
-        ratio = min(1.0, dist / max_dist)
-        norm_x = (dx / dist) * ratio
-        norm_y = (dy / dist) * ratio
+
+        sw = user32.GetSystemMetrics(0) or 1920
+        sh = user32.GetSystemMetrics(1) or 1080
+
+        max_dist_x = max(center_x, sw - center_x) or 1.0
+        max_dist_y = max(center_y, sh - center_y) or 1.0
+
+        fx = max(-1.0, min(1.0, dx / max_dist_x))
+        fy = max(-1.0, min(1.0, -dy / max_dist_y))
+
         return {
-            "x": round(norm_x, 3),
-            "y": round(norm_y, 3),
+            "fx": round(fx, 4),
+            "fy": round(fy, 4),
+            "x": round(fx, 4),
+            "y": round(fy, 4),
             "raw_dx": round(dx, 1),
             "raw_dy": round(dy, 1)
         }
 
 tracker_api = TrackerApi()
+
+latest_speech_info = {}
+speech_id_counter = 0
+
+def queue_speech(payload):
+    global latest_speech_info, speech_id_counter
+    speech_id_counter += 1
+    payload["msgId"] = speech_id_counter
+    payload["timestamp"] = time.time()
+    latest_speech_info = payload
+    if main_window:
+        try:
+            main_window.evaluate_js(f"window.playSpeech && window.playSpeech({json.dumps(payload)});")
+        except Exception as js_err:
+            log_msg(f"evaluate_js error: {js_err}")
+    return payload
+
+class ResourceMonitor:
+    def __init__(self):
+        self.last_alert_time = 0.0
+
+    def trigger_alert(self, cpu, mem):
+        now = time.time()
+        # Cooldown: at least 10 minutes between overload alerts
+        if now - self.last_alert_time < 10 * 60:
+            return False
+        self.last_alert_time = now
+        cfg = load_config()
+        char_id = cfg.get("character", "ac_base_rem01")
+        curr_info = char_mgr.get_character(char_id) if char_mgr else None
+        name = curr_info.get("baseName", "렘") if curr_info else "렘"
+
+        alert_text = f"컴퓨터 리소스 과부하 감지! (CPU: {int(cpu)}%, RAM: {int(mem)}%) 무거운 프로그램을 정리해 주세요!"
+        motion = char_mgr.get_motion_for_emotion(char_id, "surprise") if char_mgr else None
+
+        payload = {
+            "text": alert_text,
+            "motion": motion,
+            "emotion": "surprise",
+            "character": char_id,
+            "source": "resource_monitor"
+        }
+        queue_speech(payload)
+        log_msg(f"ResourceMonitor alert: CPU {cpu}%, RAM {mem}%")
+        return True
+
+    def loop(self):
+        time.sleep(20)
+        while True:
+            try:
+                time.sleep(15)
+                cfg = load_config()
+                if not cfg.get("resource_alert", True):
+                    continue
+                cpu, mem = get_system_load()
+                if cpu > 90 or mem > 90:
+                    self.trigger_alert(cpu, mem)
+            except Exception as e:
+                log_msg(f"ResourceMonitor loop error: {traceback.format_exc()}")
+                time.sleep(20)
+
+resource_monitor = ResourceMonitor()
 
 # Bottle Application
 app = Bottle()
@@ -404,32 +529,35 @@ def api_codex_event():
             "event": event_type
         }
 
-        if main_window:
-            try:
-                main_window.evaluate_js(f"window.playSpeech && window.playSpeech({json.dumps(payload)});")
-            except Exception as js_err:
-                log_msg(f"evaluate_js event error: {js_err}")
-
+        queue_speech(payload)
         return json.dumps({"success": True, "payload": payload})
     except Exception as e:
         log_msg(f"api_codex_event error: {e}")
         return json.dumps({"success": False, "error": str(e)})
 
 # Dialogue / Speech Bubble Endpoint
-@app.route("/api/speak", method=["POST"])
+@app.route("/api/speak", method=["POST", "GET"])
 def api_speak():
     response.content_type = "application/json"
     try:
-        data = request.json or {}
-        text = data.get("text", "").strip()
+        if request.method == "POST":
+            data = request.json or {}
+            text = data.get("text", "").strip()
+            req_emotion = data.get("emotion")
+            req_char = data.get("character")
+        else:
+            data = {}
+            text = request.query.get("text", "").strip()
+            req_emotion = request.query.get("emotion")
+            req_char = request.query.get("character")
+
         if not text:
             return json.dumps({"success": False, "error": "Empty text"})
 
         cfg = load_config()
-        char_id = data.get("character") or cfg.get("character", "ac_base_rem01")
+        char_id = req_char or cfg.get("character", "ac_base_rem01")
 
         # Emotion analysis
-        req_emotion = data.get("emotion")
         if req_emotion:
             emo_info = analyze_emotion(f"[{req_emotion}] {text}")
         else:
@@ -450,16 +578,40 @@ def api_speak():
             "character": char_id
         }
 
-        if main_window:
-            try:
-                main_window.evaluate_js(f"window.playSpeech && window.playSpeech({json.dumps(payload)});")
-            except Exception as js_err:
-                log_msg(f"evaluate_js playSpeech error: {js_err}")
-
+        queue_speech(payload)
         return json.dumps({"success": True, "payload": payload})
     except Exception as e:
         log_msg(f"api_speak error: {traceback.format_exc()}")
         return json.dumps({"success": False, "error": str(e)})
+
+@app.route("/api/poll_speech")
+def poll_speech():
+    response.content_type = "application/json"
+    last_id = int(request.query.get("last", 0))
+    if latest_speech_info and latest_speech_info.get("msgId", 0) > last_id:
+        return json.dumps(latest_speech_info)
+    return json.dumps({})
+
+@app.route("/api/bring_to_front")
+def api_bring_to_front():
+    response.content_type = "application/json"
+    success = tracker_api.bring_to_front()
+    return json.dumps({"success": success})
+
+@app.route("/api/model_loaded")
+def api_model_loaded():
+    response.content_type = "application/json"
+    char_id = request.query.get("id", "")
+    log_msg(f"Live2D Model loaded successfully: {char_id}")
+    return json.dumps({"success": True})
+
+@app.route("/api/model_error")
+def api_model_error():
+    response.content_type = "application/json"
+    char_id = request.query.get("id", "")
+    err = request.query.get("error", "")
+    log_msg(f"Live2D Model load error ({char_id}): {err}")
+    return json.dumps({"success": True})
 
 def run_server(port=8990):
     try:
@@ -578,13 +730,16 @@ if __name__ == "__main__":
                 payload = {
                     "text": greet_txt,
                     "character": cfg.get("character", "ac_base_rem01"),
-                    "motion": char_mgr.get_motion_for_emotion(cfg.get("character", "ac_base_rem01"), "joy_cheer") if char_mgr else None
+                    "motion": char_mgr.get_motion_for_emotion(cfg.get("character", "ac_base_rem01"), "joy_cheer") if char_mgr else None,
+                    "emotion": "joy_cheer"
                 }
-                if main_window:
-                    main_window.evaluate_js(f"window.playSpeech && window.playSpeech({json.dumps(payload)});")
+                queue_speech(payload)
             except Exception as ge:
                 log_msg(f"Greeting error: {ge}")
         threading.Thread(target=greeting, daemon=True).start()
+
+        # Start background resource monitor
+        threading.Thread(target=resource_monitor.loop, daemon=True).start()
 
     try:
         webview.start(on_window_ready, storage_path=WV2_STORAGE, private_mode=False)
