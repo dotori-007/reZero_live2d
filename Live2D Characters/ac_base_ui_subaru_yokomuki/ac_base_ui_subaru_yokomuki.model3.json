@@ -1,0 +1,19 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "ac_base_ui_subaru_yokomuki.moc3",
+    "Textures": [
+      "textures/texture_00.png"
+    ],
+    "Physics": null,
+    "Expressions": [],
+    "Motions": {
+      "": [
+        {
+          "File": "motions/AC_UI_subaru_yokomuki.motion3.json"
+        }
+      ]
+    }
+  },
+  "Groups": []
+}

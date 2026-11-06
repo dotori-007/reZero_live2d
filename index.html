@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Re:Zero Live2D Companion</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: transparent !important;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      cursor: grab;
+    }
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+
+    /* Floating Quick Bar */
+    .quick-bar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      gap: 6px;
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    body:hover .quick-bar {
+      opacity: 1;
+    }
+    .btn-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      transition: transform 0.15s, background 0.15s;
+    }
+    .btn-icon:hover {
+      transform: scale(1.12);
+      background: #ffffff;
+    }
+
+    /* Comic Speech Bubble */
+    .speech-bubble-container {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      max-width: 290px;
+      z-index: 50;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    }
+    .speech-bubble-container.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+    .speech-bubble {
+      background: #ffffff;
+      color: #1f2937;
+      padding: 12px 16px;
+      border-radius: 18px;
+      font-size: 13px;
+      line-height: 1.5;
+      font-weight: 600;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0,0,0,0.08);
+      position: relative;
+      text-align: center;
+      word-break: keep-all;
+      border: 2px solid #8b5cf6;
+    }
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 10px 10px 0;
+      border-style: solid;
+      border-color: #8b5cf6 transparent;
+      display: block;
+      width: 0;
+    }
+    .speech-bubble::before {
+      content: '';
+      position: absolute;
+      bottom: -7px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 8px 8px 0;
+      border-style: solid;
+      border-color: #ffffff transparent;
+      display: block;
+      width: 0;
+      z-index: 1;
+    }
+
+    /* Subtitle Bottom Bar */
+    .bottom-subtitle {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 90%;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      padding: 8px 14px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+      z-index: 60;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      pointer-events: none;
+    }
+    .bottom-subtitle.visible {
+      opacity: 1;
+    }
+
+    /* Quick Character Picker Modal */
+    .char-picker-modal {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.95);
+      width: 88%;
+      max-height: 80%;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(14px);
+      border-radius: 16px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.3);
+      padding: 14px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      border: 1px solid rgba(139, 92, 246, 0.25);
+    }
+    .char-picker-modal.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .char-picker-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .char-picker-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #4c1d95;
+    }
+    .char-picker-close {
+      cursor: pointer;
+      font-size: 16px;
+      color: #6b7280;
+    }
+    .char-search-input {
+      width: 100%;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 12px;
+      margin-bottom: 8px;
+      outline: none;
+    }
+    .char-search-input:focus {
+      border-color: #8b5cf6;
+    }
+    .char-list-scroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-height: 220px;
+    }
+    .char-item-btn {
+      padding: 7px 10px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      border: none;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      transition: background 0.15s;
+    }
+    .char-item-btn:hover {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+    .char-item-btn.active {
+      background: #8b5cf6;
+      color: #ffffff;
+    }
+
+    /* Toast */
+    .toast-msg {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(17, 24, 39, 0.88);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      z-index: 300;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .toast-msg.visible {
+      opacity: 1;
+    }
+  </style>
+  <script src="/static/live2dcubismcore.min.js"></script>
+  <script src="/static/pixi.min.js"></script>
+  <script src="/static/cubism4.min.js"></script>
+</head>
+<body>
+  <div class="quick-bar">
+    <div class="btn-icon" onclick="toggleQuickPicker()" title="캐릭터 변경">🔄</div>
+    <div class="btn-icon" onclick="openSettings()" title="설정 열기">⚙️</div>
+    <div class="btn-icon" onclick="toggleSubtitleMode()" title="자막 모드 전환">💬</div>
+  </div>
+
+  <div class="speech-bubble-container" id="speechBubble">
+    <div class="speech-bubble" id="speechText">...</div>
+  </div>
+
+  <div class="bottom-subtitle" id="bottomSubtitle">...</div>
+
+  <div class="char-picker-modal" id="charPicker">
+    <div class="char-picker-header">
+      <span class="char-picker-title">🌸 캐릭터 즉시 변경 (198종)</span>
+      <span class="char-picker-close" onclick="toggleQuickPicker()">✕</span>
+    </div>
+    <input type="text" class="char-search-input" id="charSearch" placeholder="캐릭터 검색 (예: 렘, 에밀리아, 람)..." oninput="filterCharacters(this.value)" />
+    <div class="char-list-scroll" id="charListContainer"></div>
+  </div>
+
+  <div class="toast-msg" id="toastMsg"></div>
+
+  <div id="canvas-container"></div>
+
+  <script>
+    let app = null;
+    let live2dModel = null;
+    let currentCharId = 'ac_base_rem01';
+    let allCharacters = [];
+    let currentScale = 1.0;
+    let modelBaseWidth = 1000;
+    let modelBaseHeight = 1000;
+
+    let targetGazeX = 0;
+    let targetGazeY = 0;
+    let currentGazeX = 0;
+    let currentGazeY = 0;
+
+    let isSpeaking = false;
+    let mouthOscillator = 0;
+    let speechTimer = null;
+    let displayMode = 'bubble';
+    let subtitleEnabled = true;
+
+    function showToast(msg, duration = 1500) {
+      const el = document.getElementById('toastMsg');
+      el.textContent = msg;
+      el.classList.add('visible');
+      setTimeout(() => el.classList.remove('visible'), duration);
+    }
+
+    function initPixi() {
+      const container = document.getElementById('canvas-container');
+      app = new PIXI.Application({
+        view: document.createElement('canvas'),
+        transparent: true,
+        autoDensity: true,
+        resolution: window.devicePixelRatio || 1,
+        resizeTo: window
+      });
+      container.appendChild(app.view);
+
+      // Mouse drag setup
+      container.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && window.pywebview && window.pywebview.api) {
+          window.pywebview.api.start_drag();
+        }
+      });
+
+      // Context menu
+      window.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        toggleQuickPicker();
+      });
+
+      // Mouse tracking loop
+      setInterval(() => {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_tracking) {
+          window.pywebview.api.get_tracking().then(data => {
+            targetGazeX = data.x;
+            targetGazeY = data.y;
+          }).catch(() => {});
+        }
+      }, 50);
+
+      // Live2D Ticker
+      app.ticker.add((delta) => {
+        if (!live2dModel || !live2dModel.internalModel || !live2dModel.internalModel.coreModel) return;
+        const core = live2dModel.internalModel.coreModel;
+
+        // Smooth gaze interpolation
+        currentGazeX += (targetGazeX - currentGazeX) * 0.14;
+        currentGazeY += (targetGazeY - currentGazeY) * 0.14;
+
+        try {
+          core.setParameterValueById('ParamAngleX', currentGazeX * 28.0);
+          core.setParameterValueById('ParamAngleY', -currentGazeY * 28.0);
+          core.setParameterValueById('ParamAngleZ', currentGazeX * -8.0);
+
+          core.setParameterValueById('ParamEyeBallX', currentGazeX * 0.85);
+          core.setParameterValueById('ParamEyeBallY', -currentGazeY * 0.85);
+          core.setParameterValueById('ParamBodyAngleX', currentGazeX * 9.0);
+        } catch(e) {}
+
+        // Natural lip animation during dialogue/speech
+        if (isSpeaking) {
+          mouthOscillator += delta * 0.22;
+          const openAmount = Math.abs(Math.sin(mouthOscillator)) * 0.75;
+          try {
+            core.setParameterValueById('ParamMouthOpenY', openAmount);
+          } catch(e) {}
+        }
+      });
+    }
+
+    function resizeModel() {
+      if (!live2dModel) return;
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const baseScale = Math.min(w / modelBaseWidth, h / modelBaseHeight) * 1.25;
+      const finalScale = baseScale * currentScale;
+      live2dModel.scale.set(finalScale);
+      live2dModel.anchor.set(0.5, 0.5);
+      live2dModel.position.set(w / 2, h / 2 + 30 * currentScale);
+    }
+
+    window.addEventListener('resize', resizeModel);
+
+    // Dynamic Character Loading
+    window.loadCharacter = function(charId) {
+      if (!charId) return;
+      showToast('🌸 캐릭터 로딩 중...');
+
+      fetch('/api/character_info?id=' + encodeURIComponent(charId))
+        .then(r => r.json())
+        .then(res => {
+          if (!res.success) throw new Error(res.error || 'Failed');
+          const info = res.info;
+          currentCharId = info.id;
+
+          if (live2dModel) {
+            app.stage.removeChild(live2dModel);
+            try { live2dModel.destroy({ children: true }); } catch(e){}
+            live2dModel = null;
+          }
+
+          const modelUrl = '/characters/' + info.id + '/' + info.modelFile;
+          PIXI.live2d.Live2DModel.from(modelUrl, { autoInteract: false })
+            .then(model => {
+              live2dModel = model;
+              app.stage.addChild(model);
+
+              modelBaseWidth = model.internalModel?.originalWidth || model.internalModel?.width || model.width || 1000;
+              modelBaseHeight = model.internalModel?.originalHeight || model.internalModel?.height || model.height || 1000;
+
+              resizeModel();
+              showToast('🌸 ' + info.displayName + ' 준비 완료!');
+              updatePickerActive(charId);
+            })
+            .catch(err => {
+              console.error('Model load error:', err);
+              showToast('❌ 모델 로드 실패: ' + err.message);
+            });
+        })
+        .catch(err => {
+          console.error('Fetch info error:', err);
+        });
+    };
+
+    // Dialogue & Motion Playback (TTS-Free)
+    window.playSpeech = function(payload) {
+      const text = payload.text || '';
+      const motion = payload.motion;
+
+      // Subtitle / Bubble UI
+      if (subtitleEnabled && displayMode !== 'none') {
+        if (displayMode === 'bubble') {
+          const bubble = document.getElementById('speechBubble');
+          const textEl = document.getElementById('speechText');
+          textEl.textContent = text;
+          bubble.classList.add('visible');
+        } else {
+          const sub = document.getElementById('bottomSubtitle');
+          sub.textContent = text;
+          sub.classList.add('visible');
+        }
+      }
+
+      // Motion
+      if (live2dModel && motion) {
+        try {
+          live2dModel.motion('', motion);
+        } catch(e) {}
+      }
+
+      // Start procedural mouth animation
+      isSpeaking = true;
+      mouthOscillator = 0;
+
+      clearTimeout(speechTimer);
+      const readDuration = Math.max(2200, Math.min(8500, text.length * 90));
+      speechTimer = setTimeout(finishSpeaking, readDuration);
+    };
+
+    function finishSpeaking() {
+      isSpeaking = false;
+      document.getElementById('speechBubble').classList.remove('visible');
+      document.getElementById('bottomSubtitle').classList.remove('visible');
+      if (live2dModel && live2dModel.internalModel && live2dModel.internalModel.coreModel) {
+        try {
+          live2dModel.internalModel.coreModel.setParameterValueById('ParamMouthOpenY', 0);
+        } catch(e) {}
+      }
+    }
+
+    // Quick Character Picker UI
+    function toggleQuickPicker() {
+      const modal = document.getElementById('charPicker');
+      modal.classList.toggle('visible');
+      if (modal.classList.contains('visible')) {
+        renderCharacterList(allCharacters);
+      }
+    }
+
+    function renderCharacterList(list) {
+      const container = document.getElementById('charListContainer');
+      container.innerHTML = '';
+      list.slice(0, 50).forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'char-item-btn' + (c.id === currentCharId ? ' active' : '');
+        btn.innerHTML = `<span>${c.displayName}</span><span style="font-size:10px; opacity:0.7;">${c.category}</span>`;
+        btn.onclick = () => {
+          fetch('/api/character', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ character: c.id })
+          }).then(() => {
+            toggleQuickPicker();
+          });
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function filterCharacters(q) {
+      const term = (q || '').toLowerCase().trim();
+      if (!term) {
+        renderCharacterList(allCharacters);
+        return;
+      }
+      const filtered = allCharacters.filter(c =>
+        c.displayName.toLowerCase().includes(term) ||
+        c.id.toLowerCase().includes(term) ||
+        c.category.toLowerCase().includes(term)
+      );
+      renderCharacterList(filtered);
+    }
+
+    function updatePickerActive(activeId) {
+      document.querySelectorAll('.char-item-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(activeId));
+      });
+    }
+
+    function openSettings() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.toggle_settings();
+      } else {
+        window.open('/settings', '_blank');
+      }
+    }
+
+    function toggleSubtitleMode() {
+      displayMode = displayMode === 'bubble' ? 'bottom' : 'bubble';
+      showToast(displayMode === 'bubble' ? '💬 만화 말풍선 모드' : '💬 하단 자막 모드');
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_mode: displayMode })
+      }).catch(() => {});
+    }
+
+    window.onConfigUpdated = function(cfg) {
+      if (cfg.display_mode) displayMode = cfg.display_mode;
+      if (typeof cfg.subtitle_enabled === 'boolean') subtitleEnabled = cfg.subtitle_enabled;
+    };
+
+    // Initialization
+    window.addEventListener('DOMContentLoaded', () => {
+      initPixi();
+
+      // Fetch config & initial character
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => {
+          if (cfg.display_mode) displayMode = cfg.display_mode;
+          if (typeof cfg.subtitle_enabled === 'boolean') subtitleEnabled = cfg.subtitle_enabled;
+          const initialChar = cfg.character || 'ac_base_rem01';
+          window.loadCharacter(initialChar);
+        })
+        .catch(() => {
+          window.loadCharacter('ac_base_rem01');
+        });
+
+      // Load all characters for quick picker
+      fetch('/api/characters')
+        .then(r => r.json())
+        .then(data => {
+          if (data.characters) {
+            allCharacters = data.characters;
+          }
+        })
+        .catch(() => {});
+    });
+  </script>
+</body>
+</html>

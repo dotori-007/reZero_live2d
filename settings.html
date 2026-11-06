@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Re:Zero Live2D 컴패니언 설정</title>
+  <style>
+    :root {
+      --primary: #7c3aed;
+      --primary-hover: #6d28d9;
+      --primary-light: #ede9fe;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --radius: 12px;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .header {
+      padding: 16px 20px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .header-desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .tabs-bar {
+      display: flex;
+      background: var(--card-bg);
+      padding: 0 16px;
+      border-bottom: 1px solid var(--border);
+      gap: 6px;
+    }
+    .tab-btn {
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: none;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover {
+      color: var(--primary);
+    }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    .content-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 20px;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Character Tab */
+    .search-box {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      font-size: 13px;
+      background: #ffffff;
+      outline: none;
+      margin-bottom: 10px;
+    }
+    .search-box:focus {
+      border-color: var(--primary);
+    }
+    .category-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .cat-pill {
+      padding: 4px 10px;
+      border-radius: 16px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .cat-pill:hover, .cat-pill.active {
+      background: var(--primary);
+      color: #ffffff;
+    }
+    .char-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      max-height: 480px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+    .char-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .char-card:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(124, 58, 237, 0.12);
+    }
+    .char-card.active {
+      border-color: var(--primary);
+      background: #fdf4ff;
+      border-width: 2px;
+    }
+    .char-card-name {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.3;
+    }
+    .char-card-badge {
+      font-size: 10px;
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 2px 6px;
+      border-radius: 6px;
+      align-self: flex-start;
+      font-weight: 600;
+    }
+    .char-select-btn {
+      width: 100%;
+      padding: 6px 0;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: none;
+      background: var(--primary-light);
+      color: var(--primary);
+      cursor: pointer;
+    }
+    .char-card.active .char-select-btn {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    /* Codex Tab */
+    .codex-event-btn {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+    .codex-event-btn:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary);
+    }
+
+    /* Form Controls */
+    .form-group {
+      background: var(--card-bg);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .form-label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .form-val {
+      font-size: 12px;
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .slider {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .radio-group {
+      display: flex;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .radio-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .footer {
+      padding: 12px 20px;
+      background: var(--card-bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-secondary {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: var(--border);
+      color: var(--text-main);
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="header-title">🌸 Re:Zero Live2D 컴패니언 설정</div>
+      <div class="header-desc">198종 캐릭터 교체 & 코덱스(Codex) AI 개발 환경설정</div>
+    </div>
+  </div>
+
+  <div class="tabs-bar">
+    <button class="tab-btn active" onclick="switchTab('tab-chars')">👥 캐릭터 선택 (198종)</button>
+    <button class="tab-btn" onclick="switchTab('tab-codex')">🤖 코덱스(Codex) 연동</button>
+    <button class="tab-btn" onclick="switchTab('tab-ui')">💬 자막 및 말풍선</button>
+    <button class="tab-btn" onclick="switchTab('tab-window')">🖥️ 마스코트 제어</button>
+  </div>
+
+  <div class="content-area">
+    <!-- Character Select Tab -->
+    <div id="tab-chars" class="tab-content active">
+      <input type="text" id="charSearch" class="search-box" placeholder="🔍 캐릭터명 또는 코스튬 검색 (예: 렘, 에밀리아, 람, 웨딩, 수영복)..." oninput="filterChars()" />
+      <div class="category-pills" id="categoryPills">
+        <span class="cat-pill active" onclick="setCategoryFilter('all')">전체</span>
+        <span class="cat-pill" onclick="setCategoryFilter('렘')">렘</span>
+        <span class="cat-pill" onclick="setCategoryFilter('에밀리아')">에밀리아</span>
+        <span class="cat-pill" onclick="setCategoryFilter('람')">람</span>
+        <span class="cat-pill" onclick="setCategoryFilter('베아트리스')">베아트리스</span>
+        <span class="cat-pill" onclick="setCategoryFilter('스바루')">스바루</span>
+        <span class="cat-pill" onclick="setCategoryFilter('에키드나')">에키드나</span>
+        <span class="cat-pill" onclick="setCategoryFilter('펠트')">펠트</span>
+        <span class="cat-pill" onclick="setCategoryFilter('페리스')">페리스</span>
+        <span class="cat-pill" onclick="setCategoryFilter('크루쉬')">크루쉬</span>
+        <span class="cat-pill" onclick="setCategoryFilter('기타')">기타</span>
+      </div>
+      <div class="char-grid" id="charGrid"></div>
+    </div>
+
+    <!-- Codex Tab -->
+    <div id="tab-codex" class="tab-content">
+      <div class="form-group">
+        <div class="form-label">
+          <span>코덱스(Codex) 연동 상태</span>
+          <span class="form-val" style="color:#10b981;">● 실시간 수신 대기 중 (포트 8990)</span>
+        </div>
+        <p style="font-size:12px; color:var(--text-muted); line-height:1.6;">
+          코덱스(Codex) 및 AI 에이전트 CLI에서 <code>python speak.py --event &lt;event&gt;</code> 명령어를 호출하여 리제로 마스코트의 반응과 말풍선을 즉각 트리거할 수 있습니다.
+        </p>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">코덱스 이벤트 즉시 테스트</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;">
+          <button class="codex-event-btn" onclick="sendCodexEvent('start', '코덱스 작업 분석을 시작합니다!')">🚀 작업 시작 (Start)</button>
+          <button class="codex-event-btn" onclick="sendCodexEvent('thinking', '코드를 면밀히 분석하고 있습니다...')">🔍 분석/생각 (Thinking)</button>
+          <button class="codex-event-btn" onclick="sendCodexEvent('success', '빌드 및 작업이 성공적으로 완료되었습니다!')">🎉 성공 (Success)</button>
+          <button class="codex-event-btn" onclick="sendCodexEvent('error', '오류가 발생하여 확인이 필요합니다 ㅠㅠ')">❌ 오류 (Error)</button>
+          <button class="codex-event-btn" onclick="sendCodexEvent('warning', '주의가 필요한 부분이 감지되었습니다!')">⚠️ 경고 (Warning)</button>
+          <button class="codex-event-btn" onclick="sendCodexEvent('nod', '스바루 군, 무엇이든 맡겨주세요!')">✨ 끄덕임/격려 (Nod)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- UI Tab -->
+    <div id="tab-ui" class="tab-content">
+      <div class="form-group">
+        <div class="form-label">대사 표시 모드</div>
+        <div class="radio-group">
+          <label><input type="radio" name="dispMode" value="bubble" onchange="saveConfigField('display_mode', this.value)" /> 만화 말풍선</label>
+          <label><input type="radio" name="dispMode" value="bottom" onchange="saveConfigField('display_mode', this.value)" /> 하단 반투명 바</label>
+          <label><input type="radio" name="dispMode" value="none" onchange="saveConfigField('display_mode', this.value)" /> 숨김</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">
+          <span>자막 글자 크기</span>
+          <span class="form-val" id="valSubSize">13px</span>
+        </div>
+        <input type="range" id="subSize" class="slider" min="10" max="18" step="1" value="13" oninput="updateVal('valSubSize', this.value + 'px'); saveConfigField('subtitle_size', parseInt(this.value, 10))" />
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">
+          <span>PC 리소스 과부하 자동 감지 경고</span>
+        </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+          <input type="checkbox" id="resAlert" onchange="saveConfigField('resource_alert', this.checked)" /> CPU 또는 RAM 점유율 90% 초과 시 모션 경고
+        </label>
+      </div>
+    </div>
+
+    <!-- Window Tab -->
+    <div id="tab-window" class="tab-content">
+      <div class="form-group">
+        <div class="form-label">
+          <span>마스코트 윈도우 너비</span>
+          <span class="form-val" id="valWinW">320px</span>
+        </div>
+        <input type="range" id="winW" class="slider" min="260" max="640" step="20" value="320" oninput="updateVal('valWinW', this.value + 'px'); applyResize()" />
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">
+          <span>마스코트 윈도우 높이</span>
+          <span class="form-val" id="valWinH">400px</span>
+        </div>
+        <input type="range" id="winH" class="slider" min="320" max="800" step="20" value="400" oninput="updateVal('valWinH', this.value + 'px'); applyResize()" />
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span style="font-size: 11.5px; color: var(--text-muted);" id="statusText">준비 완료</span>
+    <button class="btn-secondary" onclick="closeSettings()">닫기</button>
+  </div>
+
+  <script>
+    let allCharacters = [];
+    let currentCharId = 'ac_base_rem01';
+    let currentCategory = 'all';
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById(tabId).classList.add('active');
+    }
+
+    function updateVal(id, text) {
+      document.getElementById(id).textContent = text;
+    }
+
+    function setCategoryFilter(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(p => {
+        p.classList.toggle('active', p.textContent.includes(cat) || (cat === 'all' && p.textContent === '전체'));
+      });
+      filterChars();
+    }
+
+    function filterChars() {
+      const q = (document.getElementById('charSearch').value || '').toLowerCase().trim();
+      const filtered = allCharacters.filter(c => {
+        const matchCat = (currentCategory === 'all') ||
+                         (currentCategory === '기타' && !['렘', '에밀리아', '람', '베아트리스', '스바루', '에키드나', '펠트', '페리스', '크루쉬'].includes(c.category)) ||
+                         (c.category === currentCategory);
+        const matchQuery = !q || c.displayName.toLowerCase().includes(q) || c.id.toLowerCase().includes(q) || c.costume.toLowerCase().includes(q);
+        return matchCat && matchQuery;
+      });
+      renderGrid(filtered);
+    }
+
+    function renderGrid(chars) {
+      const grid = document.getElementById('charGrid');
+      grid.innerHTML = '';
+      chars.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'char-card' + (c.id === currentCharId ? ' active' : '');
+        card.innerHTML = `
+          <div>
+            <div class="char-card-badge">${c.costume}</div>
+            <div class="char-card-name" style="margin-top:6px;">${c.displayName}</div>
+          </div>
+          <button class="char-select-btn">${c.id === currentCharId ? '✓ 현재 선택됨' : '선택하기'}</button>
+        `;
+        card.onclick = () => selectCharacter(c.id);
+        grid.appendChild(card);
+      });
+    }
+
+    function selectCharacter(charId) {
+      fetch('/api/character', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ character: charId })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          currentCharId = charId;
+          filterChars();
+          document.getElementById('statusText').textContent = '캐릭터 변경 완료: ' + res.info.displayName;
+        }
+      });
+    }
+
+    function sendCodexEvent(event, message) {
+      fetch('/api/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ event, message })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          document.getElementById('statusText').textContent = '이벤트 전송 성공: ' + event;
+        }
+      });
+    }
+
+    function saveConfigField(key, val) {
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: val })
+      }).catch(() => {});
+    }
+
+    function applyResize() {
+      const w = parseInt(document.getElementById('winW').value, 10);
+      const h = parseInt(document.getElementById('winH').value, 10);
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.resize_window) {
+        window.pywebview.api.resize_window(w, h);
+      }
+    }
+
+    function closeSettings() {
+      if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.close_settings();
+      } else {
+        window.close();
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => {
+          if (cfg.character) currentCharId = cfg.character;
+          if (cfg.display_mode) {
+            const rad = document.querySelector(`input[name="dispMode"][value="${cfg.display_mode}"]`);
+            if (rad) rad.checked = true;
+          }
+          if (cfg.subtitle_size) {
+            document.getElementById('subSize').value = cfg.subtitle_size;
+            updateVal('valSubSize', cfg.subtitle_size + 'px');
+          }
+          if (cfg.resource_alert !== undefined) {
+            document.getElementById('resAlert').checked = cfg.resource_alert;
+          }
+          if (cfg.win_w) {
+            document.getElementById('winW').value = cfg.win_w;
+            updateVal('valWinW', cfg.win_w + 'px');
+          }
+          if (cfg.win_h) {
+            document.getElementById('winH').value = cfg.win_h;
+            updateVal('valWinH', cfg.win_h + 'px');
+          }
+        });
+
+      fetch('/api/characters')
+        .then(r => r.json())
+        .then(data => {
+          if (data.characters) {
+            allCharacters = data.characters;
+            filterChars();
+          }
+        });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "ac_base_reproducer01.moc3",
+    "Textures": [
+      "textures/texture_00.png",
+      "textures/wipe_crystal.png"
+    ],
+    "Physics": null,
+    "Expressions": [],
+    "Motions": {
+      "": []
+    }
+  },
+  "Groups": [
+    {
+      "Target": "Parameter",
+      "Name": "LipSync",
+      "Ids": [
+        "ParamMouthOpenY"
+      ]
+    }
+  ]
+}

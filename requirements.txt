@@ -1,0 +1,4 @@
+bottle>=0.12.25
+pywebview>=4.4.1
+pythonnet>=3.0.3
+requests>=2.28.0

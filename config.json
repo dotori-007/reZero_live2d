@@ -1,0 +1,12 @@
+{
+  "character": "ac_base_rem01",
+  "win_w": 320,
+  "win_h": 400,
+  "scale": 1.0,
+  "subtitle_enabled": true,
+  "subtitle_size": 13,
+  "display_mode": "bubble",
+  "resource_alert": true,
+  "subtitle_mode": true,
+  "port": 8990
+}

@@ -1,0 +1,35 @@
+# Large archives
+*.zip
+*.rar
+*.7z
+*.tar.gz
+
+# Python cache & logs
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+crash.log
+app_out.log
+app_err.log
+
+# Audio and temporary cache
+audio_cache/
+*.wav
+*.mp3
+
+# WebView2 and OS files
+*.tmp
+rezero_wv2_data/
+zundamon_wv2_data/
+Thumbs.db
+.DS_Store
+
+# Virtual environments
+venv/
+.env
+.venv/
+
+# IDE
+.vscode/
+.idea/

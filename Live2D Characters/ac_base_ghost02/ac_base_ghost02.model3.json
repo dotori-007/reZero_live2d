@@ -1,0 +1,69 @@
+{
+  "Version": 3,
+  "FileReferences": {
+    "Moc": "ac_base_ghost02.moc3",
+    "Textures": [
+      "textures/texture_00.png"
+    ],
+    "Physics": null,
+    "Expressions": [
+      {
+        "Name": "AC_ghost02_add_select_C.exp3.json",
+        "File": "expressions/AC_ghost02_add_select_C.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_cheek_off.exp3.json",
+        "File": "expressions/AC_ghost02_face_cheek_off.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_cheek_on.exp3.json",
+        "File": "expressions/AC_ghost02_face_cheek_on.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_talk_large.exp3.json",
+        "File": "expressions/AC_ghost02_face_talk_large.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_talk_normal.exp3.json",
+        "File": "expressions/AC_ghost02_face_talk_normal.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_talk_off.exp3.json",
+        "File": "expressions/AC_ghost02_face_talk_off.exp3.json"
+      },
+      {
+        "Name": "AC_ghost02_face_talk_small.exp3.json",
+        "File": "expressions/AC_ghost02_face_talk_small.exp3.json"
+      }
+    ],
+    "Motions": {
+      "": [
+        {
+          "File": "motions/AC_ghost02_act_ikaru.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_act_ikaru_w.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_act_normal_w.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_add_select_L.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_add_select_R.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_face_ikaru.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_face_ikaru_w.motion3.json"
+        },
+        {
+          "File": "motions/AC_ghost02_face_normal_w.motion3.json"
+        }
+      ]
+    }
+  },
+  "Groups": []
+}
